@@ -1,0 +1,6 @@
+# Core dependencies
+curl-cffi>=0.6.0
+requests>=2.31.0
+
+# Browser automation (for browser mode and Turnstile minting)
+playwright>=1.40.0

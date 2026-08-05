@@ -1,0 +1,46 @@
+{
+  "email_provider": "duckmail",
+  "email_config": {
+    "duckmail": {
+      "api_base": "https://api.mail.tm"
+    },
+    "mail_tm": {
+      "api_base": "https://api.mail.tm"
+    },
+    "yyds": {
+      "fixed_domain": "",
+      "auto_domain": true
+    },
+    "cloudflare": {
+      "worker_url": "",
+      "admin_token": "",
+      "domain": ""
+    },
+    "cloudflare_temp": {
+      "api_base": "https://your-worker.pages.dev",
+      "api_key": "your-jwt-or-key",
+      "auth_mode": "bearer",
+      "domain": ["yourdomain.com"]
+    },
+    "outlook": {
+      "email": "yourname@outlook.com",
+      "app_password": "your-app-password",
+      "use_alias": true
+    }
+  },
+  "register_mode": "browser",
+  "register_workers": 1,
+  "count": 1,
+  "proxy": "",
+  "headless": false,
+  "chrome_profile": "",
+  "enable_nsfw": false,
+  "output_dir": "./accounts",
+  "cpa_auth_dir": "",
+  "cpa_remote_url": "",
+  "cpa_management_key": "",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "timeout": 120,
+  "retries": 3,
+  "delay_between": [5, 15]
+}
