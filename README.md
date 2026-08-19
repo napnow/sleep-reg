@@ -1,15 +1,18 @@
 # ChatGPT Registration Tool (chatgpt-register-cpa)
 
-基于 grokRegister-cpa 架构的 ChatGPT/OpenAI 半自动注册机。
+基于 grokRegister-cpa 架构的 ChatGPT/OpenAI 自动注册机（支持全自动与半自动）。
 
 > 📖 **新手必读**：[完整使用教程 TUTORIAL.md](./TUTORIAL.md)（含半自动操作步骤、法律边界）
 > ⚠️ **法律条款**：[NOTICE.md](./NOTICE.md)
 
 ## 功能特性
 
+- **全自动注册**: 浏览器模式 OTP 后自动完成「继续 → 姓名/生日/年龄 → 服务条款 → 欢迎页」，无需人工介入
+- **自动补号 (Auto-refill)**: `auto_register_agent.py` 轮询 gpt2api 号池，低于阈值自动注册补齐并上传
 - **协议模式 (Protocol)**: 纯 HTTP 注册流程（curl_cffi 指纹模拟），无需浏览器
-- **浏览器模式 (Browser)**: Playwright 浏览器自动化作为备选
-- **多种邮箱**: 支持 DuckMail/Mail.tm、Outlook、Cloudflare Workers 等
+- **浏览器模式 (Browser)**: Playwright 自动化（有头/无头皆可），自动探测系统 Chrome，无则回退内置 Chromium
+- **服务器部署**: tkinter 可选导入 + `--no-sandbox`，可在无桌面 Linux 服务器用 xvfb 运行
+- **多种邮箱**: 支持 DuckMail/Mail.tm、Outlook、Cloudflare Workers（含随机子域名）等
 - **GUI/CLI**: 图形界面和命令行双模式
 - **Token 提取**: 自动提取 access_token, refresh_token 等
 - **结果导出**: 保存为 JSON 和 accounts.txt 格式
@@ -42,10 +45,14 @@ cp config.example.json config.json
 ```json
 {
   "email_provider": "duckmail",      // 邮箱提供商
-  "register_mode": "protocol",       // 注册模式: protocol/browser
+  "register_mode": "browser",        // 注册模式: protocol/browser
   "count": 1,                        // 注册数量
-  "proxy": "",                       // 代理设置
+  "proxy": "",                       // 代理设置 (如 http://127.0.0.1:10808)
+  "headless": false,                 // 浏览器是否无头运行 (服务器配合 xvfb 使用)
+  "chrome_profile": "",              // Chrome profile 路径，留空用临时 profile
   "output_dir": "./accounts",        // 输出目录
+  "cpa_remote_url": "",              // gpt2api 地址 (自动上传时填写)
+  "cpa_management_key": "",          // gpt2api 管理密钥
   "timeout": 120,                    // 超时时间
   "delay_between": [5, 15]          // 注册间隔
 }
@@ -73,6 +80,54 @@ python chatgpt_register_ttk.py cli --once
 # 使用代理
 python chatgpt_register_ttk.py cli --once --config config.json
 ```
+
+### 无桌面服务器 (headless 环境)
+
+无头服务器上 tkinter 不可用，走 CLI 模式；配合 `xvfb` 以「有头模式」运行真实 Chrome（比无头更容易绕过 Cloudflare 拦截）：
+
+```bash
+# 安装 xvfb + Chrome
+apt install -y xvfb google-chrome-stable
+
+# 用 xvfb 跑有头模式注册（config.json 中 headless=false, proxy=代理）
+xvfb-run -a python chatgpt_register_ttk.py cli --count 5
+```
+
+> 注意：`headless: true` 的纯无头模式（包括真 Chrome 无头）会被 Cloudflare "Just a moment" 拦截导致收不到验证码，推荐 xvfb + 有头模式。
+
+### 自动补号 (Auto-refill agent)
+
+配合 gpt2api 的 `/api/auto_register/status` 接口，自动检测号池并在低于阈值时补号：
+
+```bash
+# 前台运行
+python auto_register_agent.py
+
+# 单次检查（配合 crontab/systemd 使用）
+python auto_register_agent.py --once
+
+# systemd 常驻示例 /etc/systemd/system/auto-register-agent.service
+[Unit]
+Description=Auto Register Agent
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/path/to/venv/bin/python /path/to/auto_register_agent.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+配置 `auto_register_agent.json`：
+
+```json
+{ "interval_sec": 300 }   // 轮询间隔（秒）
+```
+
+agent 从 `config.json` 读取 `cpa_remote_url` 和 `cpa_management_key`（Bearer 认证）请求状态接口；当返回 `enabled=true && need_refill=true` 时自动运行 `cli --count N` 注册并把结果上传回号池。
 
 ## 邮箱提供商
 
@@ -134,13 +189,26 @@ chatgpt_register_ttk.py    # 主入口 (GUI/CLI)
 │   ├── sentinel.py        # Sentinel token 生成
 │   ├── pkce.py            # PKCE 工具
 │   └── turnstile.py       # Turnstile token 获取
-├── browser_register.py    # 浏览器模式
+├── browser_register.py    # 浏览器模式 (含全自动注册流程)
+├── auto_register_agent.py # 自动补号 agent (轮询 gpt2api 号池)
 ├── email_providers/       # 邮箱提供商模块
 │   ├── common.py         # 抽象接口
 │   └── duckmail.py       # Mail.tm 实现
 └── scripts/
     └── turnstile_mint.py # Turnstile token 获取
 ```
+
+### 浏览器模式全自动流程
+
+`browser_register.py` 的 `_auto_complete_signup` 在 OTP 填入后自动处理：
+
+1. 点击 OTP 页面的 Continue/提交
+2. `_detect_profile_fields` 探测姓名/生日/年龄字段
+3. `_fill_birthdate` 随机生成生日 (1995-2004)，`_fill` 姓名
+4. `_accept_terms` 勾选服务条款并提交
+5. 轮询等待注册完成；若进入欢迎页由 `_click_welcome_continue` 自动点掉
+
+全部步骤自动完成，无需人工点击；失败时降级为提示手动操作。
 
 ## OpenAI 注册流程
 
@@ -164,11 +232,12 @@ chatgpt_register_ttk.py    # 主入口 (GUI/CLI)
 
 ⚠️ **浏览器模式隐私提醒**
 
-浏览器模式会把本机 Chrome 的 `Cookies`/`Local State`/`Preferences` 复制到临时目录用于会话持久化。
+浏览器模式默认使用**全新临时 profile**（`chrome_profile` 留空时），不触碰本机 Chrome 数据。
+若配置了 `chrome_profile`，会把该 profile 的 `Cookies`/`Local State`/`Preferences` 复制到临时目录用于会话持久化。
 为避免泄露个人账号信息，建议：
-- 使用独立浏览器或虚拟机运行
-- 或清空 `chrome_profile` 配置项并定期清理临时目录
-- 不要在共用/办公电脑上运行浏览器模式
+- 保持 `chrome_profile` 为空（每次全新 profile）
+- 或使用独立浏览器/虚拟机运行
+- 不要在共用/办公电脑上配置个人 profile 运行浏览器模式
 
 ⚠️ **免责声明**
 
