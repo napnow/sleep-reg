@@ -22,8 +22,14 @@ import queue
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-import tkinter as tk
-from tkinter import ttk, scrolledtext, filedialog, messagebox
+try:
+    import tkinter as tk
+    from tkinter import ttk, scrolledtext, filedialog, messagebox
+    _HAS_TK = True
+except Exception:  # headless servers (no tkinter)
+    tk = None
+    ttk = scrolledtext = filedialog = messagebox = None
+    _HAS_TK = False
 
 # Force UTF-8 output on Windows consoles (GBK default crashes on non-ASCII chars)
 for _stream in (sys.stdout, sys.stderr):
@@ -136,6 +142,7 @@ class ChatGPTRegisterApp:
                     email_provider=self.email_provider,
                     proxy=self.config.get("proxy"),
                     chrome_profile=self.config.get("chrome_profile", ""),
+                    headless=bool(self.config.get("headless", False)),
                     on_log=self.log,
                     on_progress=self.log,
                 )
@@ -280,6 +287,9 @@ class ChatGPTRegisterApp:
 
     def run_gui(self):
         """Run GUI mode."""
+        if not _HAS_TK:
+            print("GUI mode requires tkinter (not available on this system). Use CLI mode: python chatgpt_register_ttk.py cli --count N")
+            return
         root = tk.Tk()
         root.title("ChatGPT Registration Tool")
         root.geometry("800x600")

@@ -69,11 +69,13 @@ class CloudflareTempProvider(EmailProvider):
             payload = {"name": ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(10)), "enablePrefix": True}
             if domain:
                 payload["domain"] = domain
+            payload["enableRandomSubdomain"] = True
             headers = self._build_headers(content_type=True)
         else:
             payload = {}
             if domain:
                 payload["domain"] = domain
+            payload["enableRandomSubdomain"] = True
             headers = {"Content-Type": "application/json"}
         try:
             resp = self.session.post(url, json=payload, headers=headers, timeout=30)
