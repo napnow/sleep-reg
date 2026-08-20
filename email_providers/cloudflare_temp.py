@@ -29,6 +29,7 @@ class CloudflareTempProvider(EmailProvider):
         self.api_key = str((config or {}).get("api_key") or "").strip()
         self.auth_mode = str((config or {}).get("auth_mode") or "bearer").strip().lower()
         self.domain = (config or {}).get("domain") or []
+        self.enable_random_subdomain = bool((config or {}).get("enable_random_subdomain", True))
         self.create_path = str((config or {}).get("create_path") or "/api/new_address").strip()
         self.messages_path = str((config or {}).get("messages_path") or "/api/mails").strip()
         self.session = curl_requests.Session()
@@ -69,13 +70,15 @@ class CloudflareTempProvider(EmailProvider):
             payload = {"name": ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(10)), "enablePrefix": True}
             if domain:
                 payload["domain"] = domain
-            payload["enableRandomSubdomain"] = True
+            if self.enable_random_subdomain:
+                payload["enableRandomSubdomain"] = True
             headers = self._build_headers(content_type=True)
         else:
             payload = {}
             if domain:
                 payload["domain"] = domain
-            payload["enableRandomSubdomain"] = True
+            if self.enable_random_subdomain:
+                payload["enableRandomSubdomain"] = True
             headers = {"Content-Type": "application/json"}
         try:
             resp = self.session.post(url, json=payload, headers=headers, timeout=30)
