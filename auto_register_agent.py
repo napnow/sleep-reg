@@ -58,8 +58,11 @@ def get_status():
 def run_registration(count: int) -> int:
     log(f"running registration count={count}")
     try:
+        cmd = [sys.executable, "chatgpt_register_ttk.py", "cli", "--count", str(count)]
+        if os.name != "nt" and not os.environ.get("DISPLAY"):
+            cmd = ["xvfb-run", "-a"] + cmd
         proc = subprocess.run(
-            [sys.executable, "chatgpt_register_ttk.py", "cli", "--count", str(count)],
+            cmd,
             cwd=BASE_DIR,
             timeout=60 * 60,
         )
