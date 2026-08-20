@@ -43,7 +43,10 @@ def load_management_key():
 
 
 def get_status():
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+    }
     key = load_management_key()
     if key:
         headers["Authorization"] = f"Bearer {key}"
